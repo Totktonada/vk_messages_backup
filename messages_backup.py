@@ -101,44 +101,86 @@ class vk_message:
         self.from_cache = from_cache
 
     def format(self, users_dict):
-        template = '%s[%s] %s: %s%s'
+        def format_timestamp(msg):
+            return datetime.fromtimestamp(msg['date'], TZ()).isoformat(' ')
+        def format_username_by_id(user_id):
+            if user_id in users_dict:
+                return str(users_dict[user_id])
+            else:
+                return 'user_' + str(user_id)
+        def format_username(msg):
+            if 'out' in msg and msg['out']:
+                user_id = 'me'
+            else:
+                user_id = msg['user_id']
+            return format_username_by_id(user_id)
+        def format_forward(msg):
+            fwd = ''
+            if 'fwd_messages' in msg:
+                fwd_mark = '>>> '
+                fwd_template = '\n' + fwd_mark + '[%s] %s:%s'
+                for fwd_msg in msg['fwd_messages']:
+                    fwd_timestamp = format_timestamp(fwd_msg)
+                    fwd_username = format_username(fwd_msg)
+                    fwd_body = (format_forward(fwd_msg) + fwd_msg['body'])
+                    fwd_body = fwd_body.replace('\n', '\n' + fwd_mark)
+                    fwd += fwd_template % (fwd_timestamp, fwd_username, fwd_body)
+            if len(fwd) == 0:
+                fwd += ' '
+            else:
+                fwd += '\n'
+            return fwd
+        def format_action(msg):
+            if 'action' in msg:
+                action_mark_left = '*** ['
+                action_mark_right = '] ***'
+                if 'action_mid' in msg:
+                    if int(msg['action_mid']) > 0:
+                        act_username = format_username_by_id(int(msg['action_mid']))
+                    else:
+                        act_username = msg['action_email']
+                if msg['action'] == 'chat_photo_update':
+                    action = 'chat photo updated'
+                elif msg['action'] == 'chat_photo_remove':
+                    action = 'chat photo removed'
+                elif msg['action'] == 'chat_create':
+                    action = 'chat created: ' + msg['action_text']
+                elif msg['action'] == 'chat_title_update':
+                    action = 'chat title updated: ' + msg['action_text']
+                elif msg['action'] == 'chat_invite_user':
+                    action = 'user invited: ' + act_username
+                elif msg['action'] == 'chat_kick_user':
+                    action = 'user kicked: ' + act_username
+                else:
+                    raise NameError('vk_message.format.format_action: unsupported action type')
+                return action_mark_left + action + action_mark_right
+            else:
+                return ''
+
+        template = '%s[%s] %s:%s%s%s'
+        title = ''
         more = ''
 
-        # timestamp
-        timestamp = datetime.fromtimestamp(self.m['date'], TZ()) \
-            .isoformat(' ')
-
-        # user name
-        if self.m['out']:
-            user_id = 'me'
-        else:
-            user_id = self.m['user_id']
-        user = str(users_dict[user_id])
-
-        # title if groupchat message and exists
-        title = ''
+        # timestamp, username, body
+        timestamp = format_timestamp(self.m)
+        username = format_username(self.m)
+        body = self.m['body']
+        # forward messages if exists
+        fwd = format_forward(self.m)
+        # title if not groupchat message and exists
         if not self.is_from_groupchat() and self.m['title'].strip() != '...':
             title = self.m['title'] + '\n'
 
+        # action if exists
+        more += format_action(self.m)
         # geolocation if exists
         if 'geo' in self.m:
             more += '\n    <- geolocation attached but displaying is not implemented'
-
         # media attachments if exists
         if 'attachments' in self.m:
             more += '\n    <- media attachments attached but displaying is not implemented'
 
-        # forward messages if exists
-        if 'fwd_messages' in self.m:
-            more += '\n    <- forward messages attached but displaying is not implemented'
-            # TODO
-
-        # action if exists
-        if 'action' in self.m:
-            more += '\n    <- action attached but displaying is not implemented'
-            # TODO
-
-        return template % (title, timestamp, user, self.m['body'], more)
+        return template % (title, timestamp, username, fwd, body, more)
 
     def dialog_id(self):
         if self.is_from_groupchat():
@@ -156,8 +198,22 @@ class vk_message:
         return self.from_cache
     def is_from_groupchat(self):
         return 'chat_id' in self.m
-    def user_id(self):
-        return self.m['user_id']
+
+    def participants(self):
+        def fwd_participants(msg):
+            fwd_res = set()
+            if 'fwd_messages' in msg:
+                for fwd_msg in msg['fwd_messages']:
+                    fwd_res.add(fwd_msg['user_id'])
+                    fwd_res.update(fwd_participants(fwd_msg))
+            return fwd_res
+        res = set()
+        res.add(self.m['user_id'])
+        action_user_id = int(self.m.get('action_mid', "0"))
+        if action_user_id > 0:
+            res.add(action_user_id)
+        res.update(fwd_participants(self.m))
+        return res
 
     # for dump filename
     def title(self, users_dict):
@@ -224,7 +280,7 @@ class vk_dialog:
     def participants(self):
         users_ids = set()
         for msg in self.messages:
-            users_ids.add(msg.user_id())
+            users_ids.update(msg.participants())
         return users_ids
 
     # assume (is_from_groupchat, chatid_/user_id) id format
