@@ -6,6 +6,7 @@
 # * Maybe replace 'users_ids' with 'user_ids'?
 # * Add separate script(s) for getting url for obtaining access token
 #   and generate config.
+# * Display artist and track for audio attachments.
 
 
 import os
