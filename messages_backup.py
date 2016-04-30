@@ -468,18 +468,27 @@ def get_vk_messages(vk, sent, after_id):
     return res_messages
 
 
-# assume that users count less or equal 1000
 def get_vk_users(vk, users_ids):
     if len(users_ids) == 0:
         return []
-    users_ids_str = ','.join([str(user_id) for user_id in users_ids])
-    params = {
-        'user_ids': users_ids_str,
-        'fields': [],
-        'name_case': 'nom',
-    }
-    response = vk.do_request('users.get', params)
-    return [vk_user(user) for user in response]
+
+    chunksize = 20
+    chunks = (len(users_ids) + chunksize - 1) // chunksize
+    chunk_start = lambda i: i * chunksize
+    chunk_end = lambda i: min((i+1) * chunksize, len(users_ids))
+
+    res_users = []
+    for i in range(0, chunks):
+        users_ids_chunk = users_ids[chunk_start(i):chunk_end(i)]
+        users_ids_str = ','.join([str(user_id) for user_id in users_ids_chunk])
+        params = {
+            'user_ids': users_ids_str,
+            'fields': [],
+            'name_case': 'nom',
+        }
+        response = vk.do_request('users.get', params)
+        res_users.extend([vk_user(user) for user in response])
+    return res_users
 
 
 # Main
