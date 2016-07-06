@@ -23,9 +23,9 @@ import re
 
 class TZ(tzinfo):
     def utcoffset(self, dt):
-        return timedelta(hours=3);
+        return timedelta(hours=3)
     def dst(self, dt):
-        return timedelta(0);
+        return timedelta(0)
 
 
 def safe_mkdir(new_dir):
@@ -85,7 +85,7 @@ class vk_api:
         self.last_req_time = int(time.time())
 
         # extract response
-        r.encoding = 'utf-8';
+        r.encoding = 'utf-8'
         general_response = r.json()
         if 'error' in general_response:
             print('VK API response with error, see dump below', file=sys.stderr)
