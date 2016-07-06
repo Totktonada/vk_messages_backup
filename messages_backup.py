@@ -16,6 +16,7 @@ import requests
 import time
 from datetime import tzinfo, timedelta, datetime
 import re
+import logging
 
 
 # General purpose utils
@@ -40,6 +41,16 @@ def print_json(json_dict, file=sys.stdout):
     json.dump(json_dict, file, ensure_ascii=False, indent=4, \
         sort_keys=True)
     print(file=file)
+
+
+def prettify_logging():
+    """ Setup logger format. """
+    # TODO: colors when isatty()
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        '{asctime} {levelname:4s} {message}', style='{')
+    handler.setFormatter(formatter)
+    logging.getLogger().addHandler(handler)
 
 
 # Classes
@@ -324,11 +335,13 @@ class vk_messages_storage:
             self.add_message(msg)
 
     def save(self):
+        logging.info('Saving messages to storage...')
         safe_mkdir(self.storage_dir)
         for dialog in self.dialogs.values():
             dialog.save(self.storage_dir)
 
     def dump(self, users_dict):
+        logging.info('Dumping messages log into files...')
         safe_mkdir(self.dump_dir)
         for dialog in self.dialogs.values():
             dialog.dump(self.dump_dir, users_dict)
@@ -336,6 +349,7 @@ class vk_messages_storage:
     def load(self):
         if not os.path.isdir(self.storage_dir):
             return
+        logging.info('Loading messages from storage...')
         for filename in os.listdir(self.storage_dir):
             filepath = os.path.join(self.storage_dir, filename)
             dialog_id = vk_dialog.filepath_to_id(filepath)
@@ -399,6 +413,7 @@ class vk_users_storage:
         self.users.extend(users)
 
     def save(self):
+        logging.info('Saving users to storage...')
         safe_mkdir(self.storage_dir)
         for user in self.users:
             data = user.raw()
@@ -410,6 +425,7 @@ class vk_users_storage:
     def load(self):
         if not os.path.isdir(self.storage_dir):
             return
+        logging.info('Loading users from storage...')
         for filename in os.listdir(self.storage_dir):
             filepath = os.path.join(self.storage_dir, filename)
             user_id = vk_user.filepath_to_id(filepath)
@@ -441,6 +457,10 @@ class vk_users_storage:
 
 # get all messages from the most fresher than 'after_id'
 def get_vk_messages(vk, sent, after_id):
+    if sent:
+        logging.info('Downloading sent messages...')
+    else:
+        logging.info('Downloading received messages...')
     res_messages = []
     ids = []
     msg_per_request = 200
@@ -455,6 +475,8 @@ def get_vk_messages(vk, sent, after_id):
     if after_id != vk_message.no_id:
         params['last_message_id'] = after_id
     while True:
+        logging.info('[get_vk_messages] Downloading from offset %s...', \
+            params['offset'])
         response = vk.do_request('messages.get', params)
         messages = [vk_message(msg) for msg in response['items']]
         # stop when empty list received
@@ -472,13 +494,17 @@ def get_vk_users(vk, users_ids):
     if len(users_ids) == 0:
         return []
 
+    logging.info('Downloading users (chats\' participants)...')
+
     chunksize = 20
-    chunks = (len(users_ids) + chunksize - 1) // chunksize
+    chunks_cnt = (len(users_ids) + chunksize - 1) // chunksize
     chunk_start = lambda i: i * chunksize
     chunk_end = lambda i: min((i+1) * chunksize, len(users_ids))
 
     res_users = []
-    for i in range(0, chunks):
+    for i in range(0, chunks_cnt):
+        logging.info('[get_vk_users] Downloading chunk %d / %d', i, \
+            chunks_cnt)
         users_ids_chunk = users_ids[chunk_start(i):chunk_end(i)]
         users_ids_str = ','.join([str(user_id) for user_id in users_ids_chunk])
         params = {
@@ -493,6 +519,10 @@ def get_vk_users(vk, users_ids):
 
 # Main
 # ====
+
+# We're too silent by default
+logging.getLogger().setLevel(logging.INFO)
+prettify_logging()
 
 vk = vk_api()
 
