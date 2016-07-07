@@ -12,11 +12,11 @@
 import os
 import sys
 import json
-import requests
 import time
 from datetime import tzinfo, timedelta, datetime
 import re
 import logging
+import requests
 
 
 # General purpose utils
