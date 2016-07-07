@@ -462,7 +462,7 @@ def get_vk_messages(vk, sent, after_id):
     else:
         logging.info('Downloading received messages...')
     res_messages = []
-    ids = []
+    ids = set()
     msg_per_request = 200
     params = {
         'out': int(sent),
@@ -485,7 +485,7 @@ def get_vk_messages(vk, sent, after_id):
         for msg in messages:
             if msg.id() not in ids:
                 res_messages.append(msg)
-                ids.append(msg.id())
+                ids.add(msg.id())
         params['offset'] += msg_per_request
     return res_messages
 
