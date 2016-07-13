@@ -58,7 +58,7 @@ def prettify_logging():
 
 class vk_api:
     def __init__(self):
-        self.config_file = 'config.json'
+        self.config_file = os.path.dirname(os.path.abspath(__file__)) + '/config.json'
         self.read_config()
         self.base_url = 'https://api.vk.com/method'
         self.vk_api_version = '5.37'
