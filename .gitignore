@@ -1,3 +1,4 @@
 storage
 chatlogs
 config.json
+.*.sw[a-z]
