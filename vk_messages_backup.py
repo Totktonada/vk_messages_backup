@@ -55,8 +55,14 @@ def prettify_logging():
     logging.getLogger().addHandler(handler)
 
 
-def find_config():
+def find_config(config_file=None):
     from os.path import abspath, dirname, expanduser, join, isfile
+
+    # always return pointed file if any
+    if config_file is not None:
+        return config_file if isfile(config_file) else None
+
+    # fallback to default locations
     app_name = 'vk_messages_backup'
     conf_name = 'config.json'
     script_dir = dirname(abspath(__file__))
@@ -80,6 +86,7 @@ def create_argparser():
     parser = ArgumentParser(
         description='Backup chatlogs from vk.com social network')
     parser.add_argument('--quiet', '-q', action='store_true')
+    parser.add_argument('--config', default=None, help='specify a config file')
     parser.add_argument(
         '--storage', default='./storage',
         help='path to messages storage (default: %(default)s)')
@@ -93,8 +100,8 @@ def create_argparser():
 # =======
 
 class vk_api:
-    def __init__(self):
-        self.config_file = find_config()
+    def __init__(self, config_file=None):
+        self.config_file = find_config(config_file)
         self.read_config()
         self.base_url = 'https://api.vk.com/method'
         self.vk_api_version = '5.37'
@@ -586,7 +593,7 @@ def main():
     logging.getLogger().setLevel(log_level)
     prettify_logging()
 
-    vk = vk_api()
+    vk = vk_api(args.config)
 
     # load saved messages
     storage = vk_messages_storage(args.storage, args.chatlogs)
