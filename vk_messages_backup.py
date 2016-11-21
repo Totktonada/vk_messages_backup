@@ -25,6 +25,7 @@ import requests
 class TZ(tzinfo):
     def utcoffset(self, dt):
         return timedelta(hours=3)
+
     def dst(self, dt):
         return timedelta(0)
 
@@ -38,8 +39,8 @@ def safe_mkdir(new_dir):
 
 
 def print_json(json_dict, file=sys.stdout):
-    json.dump(json_dict, file, ensure_ascii=False, indent=4, \
-        sort_keys=True)
+    json.dump(json_dict, file, ensure_ascii=False, indent=4,
+              sort_keys=True)
     print(file=file)
 
 
@@ -94,8 +95,8 @@ class vk_api:
     # for internal use
     def read_config(self):
         if not os.path.isfile(self.config_file):
-            raise NameError('vk_api.__init__: cannot read config file: %s' % \
-                self.config_file)
+            raise NameError('vk_api.__init__: cannot read config file: %s' %
+                            self.config_file)
         with open(self.config_file, 'r') as f:
             config_data = json.load(f)
         self.access_token = config_data['access_token']
@@ -120,7 +121,8 @@ class vk_api:
         r.encoding = 'utf-8'
         general_response = r.json()
         if 'error' in general_response:
-            print('VK API response with error, see dump below', file=sys.stderr)
+            print('VK API response with error, see dump below',
+                  file=sys.stderr)
             print_json(general_response, file=sys.stderr)
             return NameError('vk_api.do_request: error response')
         return general_response['response']
@@ -136,17 +138,20 @@ class vk_message:
     def format(self, users_dict):
         def format_timestamp(msg):
             return datetime.fromtimestamp(msg['date'], TZ()).isoformat(' ')
+
         def format_username_by_id(user_id):
             if user_id in users_dict:
                 return str(users_dict[user_id])
             else:
                 return 'user_' + str(user_id)
+
         def format_username(msg):
             if 'out' in msg and msg['out']:
                 user_id = 'me'
             else:
                 user_id = msg['user_id']
             return format_username_by_id(user_id)
+
         def format_forward(msg):
             fwd = ''
             if 'fwd_messages' in msg:
@@ -157,19 +162,22 @@ class vk_message:
                     fwd_username = format_username(fwd_msg)
                     fwd_body = (format_forward(fwd_msg) + fwd_msg['body'])
                     fwd_body = fwd_body.replace('\n', '\n' + fwd_mark)
-                    fwd += fwd_template % (fwd_timestamp, fwd_username, fwd_body)
+                    fwd += fwd_template % (
+                        fwd_timestamp, fwd_username, fwd_body)
             if len(fwd) == 0:
                 fwd += ' '
             else:
                 fwd += '\n'
             return fwd
+
         def format_action(msg):
             if 'action' in msg:
                 action_mark_left = '*** ['
                 action_mark_right = '] ***'
                 if 'action_mid' in msg:
                     if int(msg['action_mid']) > 0:
-                        act_username = format_username_by_id(int(msg['action_mid']))
+                        act_username = format_username_by_id(
+                            int(msg['action_mid']))
                     else:
                         act_username = msg['action_email']
                 if msg['action'] == 'chat_photo_update':
@@ -185,7 +193,8 @@ class vk_message:
                 elif msg['action'] == 'chat_kick_user':
                     action = 'user kicked: ' + act_username
                 else:
-                    raise NameError('vk_message.format.format_action: unsupported action type')
+                    raise NameError('vk_message.format.format_action: '
+                                    'unsupported action type')
                 return action_mark_left + action + action_mark_right
             else:
                 return ''
@@ -208,10 +217,12 @@ class vk_message:
         more += format_action(self.m)
         # geolocation if exists
         if 'geo' in self.m:
-            more += '\n    <- geolocation attached but displaying is not implemented'
+            more += '\n    <- ' \
+                'geolocation attached but displaying is not implemented'
         # media attachments if exists
         if 'attachments' in self.m:
-            more += '\n    <- media attachments attached but displaying is not implemented'
+            more += '\n    <- ' \
+                'media attachments attached but displaying is not implemented'
 
         return template % (title, timestamp, username, fwd, body, more)
 
@@ -223,12 +234,16 @@ class vk_message:
 
     def raw(self):
         return self.m
+
     def id(self):
         return self.m.get('id', vk_message.no_id)
+
     def sent(self):
         return self.m['out']
+
     def is_from_cache(self):
         return self.from_cache
+
     def is_from_groupchat(self):
         return 'chat_id' in self.m
 
@@ -267,8 +282,9 @@ class vk_dialog:
 
     def add_message(self, msg):
         if msg.dialog_id() != self.id:
-            raise NameError('vk_dialog.add_message: expected %s dialog id for message, got %s' % \
-                (self.id, msg.dialog_id()))
+            raise NameError('vk_dialog.add_message: '
+                            'expected %s dialog id for message, got %s' %
+                            (self.id, msg.dialog_id()))
         self.messages.append(msg)
         self.is_sorted = False
 
@@ -375,10 +391,11 @@ class vk_messages_storage:
             filepath = os.path.join(self.storage_dir, filename)
             dialog_id = vk_dialog.filepath_to_id(filepath)
             # skip files that not matching vk_dialog naming scheme
-            if dialog_id == None:
+            if dialog_id is None:
                 continue
             if not os.path.isfile(filepath):
-                raise NameError('vk_messages_storage.load: %s is not regular file' % filepath)
+                raise NameError('vk_messages_storage.load: '
+                                '%s is not regular file' % filepath)
             with open(filepath, 'r') as f:
                 for raw_msg in json.load(f):
                     msg = vk_message(raw_msg, from_cache=True)
@@ -407,10 +424,13 @@ class vk_user:
 
     def __str__(self):
         return '%s %s' % (self.data['first_name'], self.data['last_name'])
+
     def raw(self):
         return self.data
+
     def id(self):
         return self.data.get('id', vk_user.no_id)
+
     def is_from_cache(self):
         return self.from_cache
 
@@ -451,10 +471,11 @@ class vk_users_storage:
             filepath = os.path.join(self.storage_dir, filename)
             user_id = vk_user.filepath_to_id(filepath)
             # skip files that not matching vk_user naming scheme
-            if user_id == None:
+            if user_id is None:
                 continue
             if not os.path.isfile(filepath):
-                raise NameError('vk_users_storage.load: %s is not regular file' % filepath)
+                raise NameError('vk_users_storage.load: '
+                                '%s is not regular file' % filepath)
             with open(filepath, 'r') as f:
                 user = vk_user(json.load(f), from_cache=True)
             self.users.append(user)
@@ -496,8 +517,8 @@ def get_vk_messages(vk, sent, after_id):
     if after_id != vk_message.no_id:
         params['last_message_id'] = after_id
     while True:
-        logging.info('[get_vk_messages] Downloading from offset %s...', \
-            params['offset'])
+        logging.info('[get_vk_messages] Downloading from offset %s...',
+                     params['offset'])
         response = vk.do_request('messages.get', params)
         messages = [vk_message(msg) for msg in response['items']]
         # stop when empty list received
@@ -519,13 +540,16 @@ def get_vk_users(vk, users_ids):
 
     chunksize = 20
     chunks_cnt = (len(users_ids) + chunksize - 1) // chunksize
-    chunk_start = lambda i: i * chunksize
-    chunk_end = lambda i: min((i+1) * chunksize, len(users_ids))
+
+    def chunk_start(i):
+        return i * chunksize
+
+    def chunk_end(i):
+        return min((i+1) * chunksize, len(users_ids))
 
     res_users = []
     for i in range(0, chunks_cnt):
-        logging.info('[get_vk_users] Downloading chunk %d / %d', i, \
-            chunks_cnt)
+        logging.info('[get_vk_users] Downloading chunk %d / %d', i, chunks_cnt)
         users_ids_chunk = users_ids[chunk_start(i):chunk_end(i)]
         users_ids_str = ','.join([str(user_id) for user_id in users_ids_chunk])
         params = {
@@ -551,8 +575,10 @@ vk = vk_api()
 storage = vk_messages_storage()
 storage.load()
 # load new messages
-sent_messages = get_vk_messages(vk, sent=True, after_id=storage.last_id(sent=True))
-recv_messages = get_vk_messages(vk, sent=False, after_id=storage.last_id(sent=False))
+sent_messages = get_vk_messages(
+    vk, sent=True, after_id=storage.last_id(sent=True))
+recv_messages = get_vk_messages(
+    vk, sent=False, after_id=storage.last_id(sent=False))
 storage.add_messages(sent_messages)
 storage.add_messages(recv_messages)
 # save all messages
