@@ -17,6 +17,7 @@ from datetime import tzinfo, timedelta, datetime
 import re
 import logging
 import requests
+from argparse import ArgumentParser
 
 
 # General purpose utils
@@ -73,6 +74,13 @@ def find_config():
         if isfile(f):
             return f
     return None
+
+
+def create_argparser():
+    parser = ArgumentParser(
+        description='Backup chatlogs from vk.com social network')
+    parser.add_argument('--quiet', '-q', action='store_true')
+    return parser
 
 
 # Classes
@@ -566,8 +574,10 @@ def get_vk_users(vk, users_ids):
 # ====
 
 def main():
-    # We're too silent by default
-    logging.getLogger().setLevel(logging.INFO)
+    args = create_argparser().parse_args()
+
+    log_level = logging.WARNING if args.quiet else logging.INFO
+    logging.getLogger().setLevel(log_level)
     prettify_logging()
 
     vk = vk_api()
