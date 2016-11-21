@@ -53,12 +53,33 @@ def prettify_logging():
     logging.getLogger().addHandler(handler)
 
 
+def find_config():
+    from os.path import abspath, dirname, expanduser, join, isfile
+    app_name = 'vk_messages_backup'
+    conf_name = 'config.json'
+    script_dir = dirname(abspath(__file__))
+    home_dir = expanduser('~')
+    xdg_config_dir = os.getenv('XDG_CONFIG_HOME', join(home_dir, '.config'))
+    sys_config_dir = '/etc'
+    files = [
+        (script_dir, conf_name),
+        (home_dir, '.' + app_name, conf_name),
+        (xdg_config_dir, app_name, conf_name),
+        (sys_config_dir, app_name, conf_name)
+    ]
+    for file_tuple in files:
+        f = os.path.join(*file_tuple)
+        if isfile(f):
+            return f
+    return None
+
+
 # Classes
 # =======
 
 class vk_api:
     def __init__(self):
-        self.config_file = 'config.json'
+        self.config_file = find_config()
         self.read_config()
         self.base_url = 'https://api.vk.com/method'
         self.vk_api_version = '5.37'
