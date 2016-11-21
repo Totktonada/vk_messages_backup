@@ -80,6 +80,12 @@ def create_argparser():
     parser = ArgumentParser(
         description='Backup chatlogs from vk.com social network')
     parser.add_argument('--quiet', '-q', action='store_true')
+    parser.add_argument(
+        '--storage', default='./storage',
+        help='path to messages storage (default: %(default)s)')
+    parser.add_argument(
+        '--chatlogs', default='./chatlogs',
+        help='where to save formatted chatlogs (default: %(default)s)')
     return parser
 
 
@@ -353,9 +359,9 @@ class vk_dialog:
 
 # assume that ids are integers
 class vk_messages_storage:
-    def __init__(self):
-        self.storage_dir = 'storage'
-        self.dump_dir = 'chatlogs'
+    def __init__(self, storage_dir, dump_dir):
+        self.storage_dir = storage_dir
+        self.dump_dir = dump_dir
         self.last_sent_id = vk_message.no_id
         self.last_recv_id = vk_message.no_id
         self.dialogs = dict()
@@ -583,7 +589,7 @@ def main():
     vk = vk_api()
 
     # load saved messages
-    storage = vk_messages_storage()
+    storage = vk_messages_storage(args.storage, args.chatlogs)
     storage.load()
     # load new messages
     sent_messages = get_vk_messages(
