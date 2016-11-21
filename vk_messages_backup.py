@@ -565,37 +565,41 @@ def get_vk_users(vk, users_ids):
 # Main
 # ====
 
-# We're too silent by default
-logging.getLogger().setLevel(logging.INFO)
-prettify_logging()
+def main():
+    # We're too silent by default
+    logging.getLogger().setLevel(logging.INFO)
+    prettify_logging()
 
-vk = vk_api()
+    vk = vk_api()
 
-# load saved messages
-storage = vk_messages_storage()
-storage.load()
-# load new messages
-sent_messages = get_vk_messages(
-    vk, sent=True, after_id=storage.last_id(sent=True))
-recv_messages = get_vk_messages(
-    vk, sent=False, after_id=storage.last_id(sent=False))
-storage.add_messages(sent_messages)
-storage.add_messages(recv_messages)
-# save all messages
-storage.save()
+    # load saved messages
+    storage = vk_messages_storage()
+    storage.load()
+    # load new messages
+    sent_messages = get_vk_messages(
+        vk, sent=True, after_id=storage.last_id(sent=True))
+    recv_messages = get_vk_messages(
+        vk, sent=False, after_id=storage.last_id(sent=False))
+    storage.add_messages(sent_messages)
+    storage.add_messages(recv_messages)
+    # save all messages
+    storage.save()
 
-participants = storage.participants()
+    participants = storage.participants()
 
-# load saved users
-users_storage = vk_users_storage()
-users_storage.load()
-# load missing users
-users_ids_new = list(participants - users_storage.ids())
-users_new = get_vk_users(vk, users_ids_new)
-users_storage.add_users(users_new)
-# save all users
-users_storage.save()
+    # load saved users
+    users_storage = vk_users_storage()
+    users_storage.load()
+    # load missing users
+    users_ids_new = list(participants - users_storage.ids())
+    users_new = get_vk_users(vk, users_ids_new)
+    users_storage.add_users(users_new)
+    # save all users
+    users_storage.save()
 
-# dump all messages
-users_dict = users_storage.users_dict(vk.user_id)
-storage.dump(users_dict)
+    # dump all messages
+    users_dict = users_storage.users_dict(vk.user_id)
+    storage.dump(users_dict)
+
+if __name__ == '__main__':
+    main()
