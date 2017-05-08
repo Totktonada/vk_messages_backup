@@ -466,8 +466,8 @@ class vk_user:
 
 
 class vk_users_storage:
-    def __init__(self):
-        self.storage_dir = 'storage'
+    def __init__(self, storage_dir):
+        self.storage_dir = storage_dir
         self.users = []
 
     # assume that users not added already
@@ -611,7 +611,7 @@ def main():
     participants = storage.participants()
 
     # load saved users
-    users_storage = vk_users_storage()
+    users_storage = vk_users_storage(args.storage)
     users_storage.load()
     # load missing users
     users_ids_new = list(participants - users_storage.ids())
