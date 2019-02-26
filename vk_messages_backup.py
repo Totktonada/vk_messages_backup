@@ -323,7 +323,7 @@ class vk_dialog:
     def sort(self):
         if self.is_sorted:
             return
-        self.messages.sort(key=lambda msg: msg.raw()['date'])
+        self.messages.sort(key=lambda msg: msg.id())
         self.is_sorted = True
 
     def save(self, storage_dir):
