@@ -148,6 +148,17 @@ class vk_api:
             return NameError('vk_api.do_request: error response')
         return general_response['response']
 
+def get_sender_id(m):
+    return m.get('from_id', None) or m.get('user_id', None)
+
+def get_msg_body(m):
+    body = m.get('body', None)
+    if body is not None:
+        return body
+    return m.get('text', None)
+
+def get_chat_title(m):
+    return m.get('title', 'NO TITLE') # TODO
 
 class vk_message:
     no_id = -1
@@ -170,7 +181,7 @@ class vk_message:
             if 'out' in msg and msg['out']:
                 user_id = 'me'
             else:
-                user_id = msg['user_id']
+                user_id = get_sender_id(msg)
             return format_username_by_id(user_id)
 
         def format_forward(msg):
@@ -181,7 +192,7 @@ class vk_message:
                 for fwd_msg in msg['fwd_messages']:
                     fwd_timestamp = format_timestamp(fwd_msg)
                     fwd_username = format_username(fwd_msg)
-                    fwd_body = (format_forward(fwd_msg) + fwd_msg['body'])
+                    fwd_body = (format_forward(fwd_msg) + get_msg_body(fwd_msg))
                     fwd_body = fwd_body.replace('\n', '\n' + fwd_mark)
                     fwd += fwd_template % (
                         fwd_timestamp, fwd_username, fwd_body)
@@ -227,12 +238,12 @@ class vk_message:
         # timestamp, username, body
         timestamp = format_timestamp(self.m)
         username = format_username(self.m)
-        body = self.m['body']
+        body = get_msg_body(self.m)
         # forward messages if exists
         fwd = format_forward(self.m)
         # title if not groupchat message and exists
-        if not self.is_from_groupchat() and self.m['title'].strip() != '...':
-            title = self.m['title'] + '\n'
+        if not self.is_from_groupchat() and get_chat_title(self.m).strip() != '...':
+            title = get_chat_title(self.m) + '\n'
 
         # action if exists
         more += format_action(self.m)
@@ -273,11 +284,11 @@ class vk_message:
             fwd_res = set()
             if 'fwd_messages' in msg:
                 for fwd_msg in msg['fwd_messages']:
-                    fwd_res.add(fwd_msg['user_id'])
+                    fwd_res.add(get_sender_id(fwd_msg))
                     fwd_res.update(fwd_participants(fwd_msg))
             return fwd_res
         res = set()
-        res.add(self.m['user_id'])
+        res.add(get_sender_id(self.m))
         action_user_id = int(self.m.get('action_mid', "0"))
         if action_user_id > 0:
             res.add(action_user_id)
@@ -290,7 +301,7 @@ class vk_message:
         if self.is_from_groupchat():
             title = self.m['title']
         else:
-            user_id = self.m['user_id']
+            user_id = get_sender_id(self.m)
             title = str(users_dict[user_id])
         return re.sub(bad_symbol_re, '_', title).rstrip('.')
 
