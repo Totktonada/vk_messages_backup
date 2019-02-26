@@ -358,7 +358,10 @@ class vk_dialog:
 
     # assume that all dialogs has different titles
     def dump_filename(self, users_dict):
-        return self.messages[-1].title(users_dict) + '.txt'
+        cname = self.messages[-1].title(users_dict)
+        cname = cname[:100] # max filename is 255, but anyway that should be more than enough
+        # TODO slugify?
+        return cname + '.txt'
 
     def sort(self):
         if self.is_sorted:
