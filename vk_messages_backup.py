@@ -104,7 +104,7 @@ class vk_api:
         self.config_file = find_config(config_file)
         self.read_config()
         self.base_url = 'https://api.vk.com/method'
-        self.vk_api_version = '5.37'
+        self.vk_api_version = '5.80'
         self.time_between_requests = 0.35
         self.last_req_time = 0
         self.common_params = {
@@ -409,20 +409,10 @@ class vk_messages_storage:
     def __init__(self, storage_dir, dump_dir):
         self.storage_dir = storage_dir
         self.dump_dir = dump_dir
-        self.last_sent_id = vk_message.no_id
-        self.last_recv_id = vk_message.no_id
         self.dialogs = dict()
-
-    # for internal use
-    def update_last_id(self, msg):
-        if msg.sent():
-            self.last_sent_id = max(self.last_sent_id, msg.id())
-        else:
-            self.last_recv_id = max(self.last_recv_id, msg.id())
 
     # assume that adding message is not stored already
     def add_message(self, msg):
-        self.update_last_id(msg)
         dialog_id = msg.dialog_id()
         if dialog_id not in self.dialogs.keys():
             self.dialogs[dialog_id] = vk_dialog(dialog_id)
@@ -564,39 +554,29 @@ class vk_users_storage:
 # Functions that touch certain VK API methods
 # ===========================================
 
-# get all messages from the most fresher than 'after_id'
-def get_vk_messages(vk, sent, after_id):
-    if sent:
-        logging.info('Downloading sent messages...')
-    else:
-        logging.info('Downloading received messages...')
-    res_messages = []
-    ids = set()
-    msg_per_request = 200
+def get_vk_history(vk, peer_id, last_known_message_id=None):
+    res = []
     params = {
-        'out': int(sent),
-        'offset': 0,
-        'count': msg_per_request,
-        'time_offset': 0,
-        'preview_length': 0,
+        'peer_id': peer_id,
+        'count': 200,
     }
-    # don't get messages before 'after_id' (inclusive)
-    if after_id != vk_message.no_id:
-        params['last_message_id'] = after_id
-    while True:
-        logging.info('[get_vk_messages] Downloading from offset %s...',
-                     params['offset'])
-        response = vk.do_request('messages.get', params)
-        messages = [vk_message(msg) for msg in response['items']]
-        # stop when empty list received
-        if len(messages) == 0:
-            break
-        for msg in messages:
-            if msg.id() not in ids:
-                res_messages.append(msg)
-                ids.add(msg.id())
-        params['offset'] += msg_per_request
-    return res_messages
+    done = False
+    while not done:
+        if len(res) > 0:
+            params['start_message_id'] = res[-1]['id'] - 1
+        response = vk.do_request('messages.getHistory', params)
+        items = response['items']
+        if len(items) == 0:
+            done = True
+            continue
+        for m in items:
+            if last_known_message_id is not None and m['id'] <= last_known_message_id:
+                done = True
+                break
+            else:
+                res.append(m)
+    logging.info('[get_vk_history] fetched %d new messages for %s', len(res), peer_id)
+    return res
 
 
 def get_vk_users(vk, users_ids):
@@ -629,9 +609,26 @@ def get_vk_users(vk, users_ids):
     return res_users
 
 
+def get_vk_conversations(vk):
+    results = []
+    while True:
+        params = {
+            'count': 200,
+        }
+        if len(results) > 0:
+            last_id = results[-1]['last_message_id']
+            params['start_message_id'] = last_id - 1
+        res = vk.do_request('messages.getConversations', params)
+        items = res['items'] # TODO check against 'count'?
+        if len(items) == 0:
+            break
+        results.extend([r['conversation'] for r in items])
+        logging.info('[get_vk_conversations] Downloaded %d conversations', len(results))
+    return results
+
+
 # Main
 # ====
-
 def main():
     args = create_argparser().parse_args()
 
@@ -644,14 +641,14 @@ def main():
     # load saved messages
     storage = vk_messages_storage(args.storage, args.chatlogs)
     storage.load()
-    # load new messages
-    sent_messages = get_vk_messages(
-        vk, sent=True, after_id=storage.last_id(sent=True))
-    recv_messages = get_vk_messages(
-        vk, sent=False, after_id=storage.last_id(sent=False))
-    storage.add_messages(sent_messages)
-    storage.add_messages(recv_messages)
-    # save all messages
+
+    conversations = get_vk_conversations(vk)
+    for c in conversations:
+        peer_id = c['peer']['id']
+        last_message_id = storage.last_known_message_id(peer_id=peer_id)
+        hist = get_vk_history(vk, peer_id=peer_id, last_known_message_id=last_message_id)
+        messages = list(map(vk_message, hist))
+        storage.add_messages(messages)
     storage.save()
 
     participants = storage.participants()
