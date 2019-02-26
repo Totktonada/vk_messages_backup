@@ -148,8 +148,19 @@ class vk_api:
             return NameError('vk_api.do_request: error response')
         return general_response['response']
 
+
+def peer_id_to_dialog_id(peer_id):
+    GROUP_OFFSET = 2000000000 # see https://vk.com/dev/messages.send
+    if peer_id >= GROUP_OFFSET:
+        did = (True, peer_id - GROUP_OFFSET)
+    else:
+        did = (False, peer_id)
+    return did
+
+
 def get_sender_id(m):
     return m.get('from_id', None) or m.get('user_id', None)
+
 
 def get_msg_body(m):
     body = m.get('body', None)
@@ -157,8 +168,12 @@ def get_msg_body(m):
         return body
     return m.get('text', None)
 
+
 def get_chat_title(m):
-    return m.get('title', 'NO TITLE') # TODO
+    # TODO in new api, title is not sent in each chat message
+    # till we figure out how to extract it it's fine though, since it only impacts rendering to .txt, not json raw data
+    return m.get('title', 'NO TITLE')
+
 
 class vk_message:
     no_id = -1
@@ -178,6 +193,7 @@ class vk_message:
                 return 'user_' + str(user_id)
 
         def format_username(msg):
+            # new api still got 'out' field
             if 'out' in msg and msg['out']:
                 user_id = 'me'
             else:
@@ -204,25 +220,35 @@ class vk_message:
 
         def format_action(msg):
             if 'action' in msg:
+                action = msg['action']
+                atype: str
+                act_username = None
+                if isinstance(action, dict): # new api
+                    atype = action['type']
+                    if 'member_id' in action:
+                        mid = action['member_id']
+                        act_username = format_username_by_id(mid)
+                else:
+                    atype = action
+                    if 'action_mid' in msg:
+                        if int(msg['action_mid']) > 0:
+                            act_username = format_username_by_id(int(msg['action_mid']))
+                        else:
+                            act_username = msg['action_email']
+
                 action_mark_left = '*** ['
                 action_mark_right = '] ***'
-                if 'action_mid' in msg:
-                    if int(msg['action_mid']) > 0:
-                        act_username = format_username_by_id(
-                            int(msg['action_mid']))
-                    else:
-                        act_username = msg['action_email']
-                if msg['action'] == 'chat_photo_update':
+                if atype == 'chat_photo_update':
                     action = 'chat photo updated'
-                elif msg['action'] == 'chat_photo_remove':
+                elif atype == 'chat_photo_remove':
                     action = 'chat photo removed'
-                elif msg['action'] == 'chat_create':
+                elif atype == 'chat_create':
                     action = 'chat created: ' + msg['action_text']
-                elif msg['action'] == 'chat_title_update':
+                elif atype == 'chat_title_update':
                     action = 'chat title updated: ' + msg['action_text']
-                elif msg['action'] == 'chat_invite_user':
+                elif atype == 'chat_invite_user':
                     action = 'user invited: ' + act_username
-                elif msg['action'] == 'chat_kick_user':
+                elif atype == 'chat_kick_user':
                     action = 'user kicked: ' + act_username
                 else:
                     raise NameError('vk_message.format.format_action: '
@@ -259,6 +285,9 @@ class vk_message:
         return template % (title, timestamp, username, fwd, body, more)
 
     def dialog_id(self):
+        if 'peer_id' in self.m:
+            return peer_id_to_dialog_id(self.m['peer_id'])
+
         if self.is_from_groupchat():
             return (True, self.m['chat_id'])
         else:
@@ -433,11 +462,17 @@ class vk_messages_storage:
                     msg = vk_message(raw_msg, from_cache=True)
                     self.add_message(msg)
 
-    def last_id(self, sent):
-        if sent:
-            return self.last_sent_id
-        else:
-            return self.last_recv_id
+    def last_known_message_id(self, peer_id):
+        did = peer_id_to_dialog_id(peer_id)
+        dialog = self.dialogs.get(did, None)
+        if dialog is None:
+            return None
+
+        messages = dialog.messages
+        if len(messages) == 0:
+            return None
+
+        return max(m.id() for m in messages)
 
     # return set of users' IDs
     def participants(self):
