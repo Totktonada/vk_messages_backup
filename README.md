@@ -1,3 +1,15 @@
+## The project is abandoned
+
+It uses the old VK API, which doesn't work since 2017. Later, in 2019, the
+messages API was restricted (due to privacy reasons):
+https://vk.com/dev/messages_api
+
+The author lost his interest in performing backups of his VK chats. The script
+will not be fixed.
+
+Please, file an issue or send a pull request if you know a maintained tools for
+fetching chats from VK -- I'll add links here.
+
 ## About
 
 The script for locally saving and incremental updating private and groupchat messages from social service vk.com.
